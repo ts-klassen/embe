@@ -36,19 +36,26 @@ new(Name) ->
 create_db(#{size:=Size, name:=Name, distance:=Distance}) ->
     embe_vector_db:create_collection(Name, Size, Distance).
 
--spec add(unicode:unicode_binary(), embeddings()) -> embe_vector_db:vector().
+-spec add(
+        unicode:unicode_binary(), embeddings()
+   ) -> ok | {error, vector_exists}.
 add(Input, #{name:=Name, model:=Model}) ->
     Vector = gpte_embeddings:simple(Input, Model),
     Payload = #{
         input => Input
     },
-    embe_vector_db:upsert_point(Name, Vector, fun
+    try embe_vector_db:upsert_point(Name, Vector, fun
         (none) ->
             Payload;
         ({value, _}) ->
-            erlang:error(exists)
-    end),
-    ok.
+            erlang:throw({?MODULE, exists})
+    end) of
+        _ ->
+            ok
+    catch
+        throw:{?MODULE, exists} ->
+            {error, vector_exists}
+    end.
 
 -spec search(
         unicode:unicode_binary(), non_neg_integer(), embeddings()
