@@ -47,7 +47,8 @@ add(Input, #{name:=Name, model:=Model}) ->
             Payload;
         ({value, _}) ->
             erlang:error(exists)
-    end).
+    end),
+    ok.
 
 -spec search(
         unicode:unicode_binary(), non_neg_integer(), embeddings()
