@@ -1,7 +1,8 @@
 -module(embe_vector_db).
 
 -export([
-        create_collection/3
+        init/0
+      , create_collection/3
       , upsert_point/3
       , search/2
       , search/3
@@ -29,6 +30,14 @@
       , score => false | true
     }.
 -type upsert_function() :: fun((klsn:maybe(payload()))->payload()).
+
+-spec init() -> ok.
+init() ->
+    try embe_couchdb_priv:create_db(?MODULE) of
+        _ -> ok
+    catch
+        error:exists -> ok
+    end.
 
 -spec create_collection(
         collection_name(), non_neg_integer(), distance()

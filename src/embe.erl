@@ -21,7 +21,7 @@
 
 -spec init_setup() -> ok.
 init_setup() ->
-    embe_couchdb_priv:create_db(embe_vector_db).
+    embe_vector_db:init().
 
 -spec new(atom() | unicode:unicode_binary()) -> embeddings().
 new(Name) ->
