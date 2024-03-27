@@ -13,6 +13,10 @@
       , update/4
       , upsert/3
       , upsert/4
+      , lookup_attachment/3
+      , lookup_attachment/4
+      , upload_attachment/4
+      , upload_attachment/5
       , time_now/0
       , new_id/0
     ]).
@@ -185,6 +189,67 @@ upsert_(Db, Key, Fun, Info, Retry) ->
             timer:sleep(500),
             upsert_(Db, Key, Fun, Info, Retry-5)
     end.
+
+
+-spec lookup_attachment(
+        db(), key(), unicode:unicode_binary()
+    ) -> klsn:maybe(binary()).
+lookup_attachment(Db, Key, Name) ->
+    lookup_attachment(Db, Key, Name, db_info()).
+
+-spec lookup_attachment(
+        db(), key(), info(), unicode:unicode_binary()
+    ) -> klsn:maybe(binary()).
+lookup_attachment(Db, Key, Name, Info) when is_atom(Db) ->
+    lookup_attachment(atom_to_binary(Db), Key, Name, Info);
+lookup_attachment(Db0, Key0, Name0, #{url:=Url0}) ->
+    Db1 = cow_qs:urlencode(Db0),
+    Db = <<"/", Db1/binary>>,
+    Key1 = cow_qs:urlencode(Key0),
+    Key = <<"/", Key1/binary>>,
+    Name1 = cow_qs:urlencode(Name0),
+    Name = <<"/", Name1/binary>>,
+    Url = <<Url0/binary, Db/binary, Key/binary, Name/binary>>,
+    Res = httpc:request(get, {Url, []}, [], [{body_format, binary}]),
+    case Res of
+        {ok, {{_, Stat, _}, _, Data}} when 200=<Stat,Stat=<299->
+            {value, Data};
+        {ok, {{_, 404, _}, _, _}} ->
+            none
+    end.
+
+
+-spec upload_attachment(
+        db(), key(), binary(), unicode:unicode_binary()
+    ) -> {id(), rev()}.
+upload_attachment(Db, Key, Name, Data) ->
+    upload_attachment(Db, Key, Name, Data, db_info()).
+
+-spec upload_attachment(
+        db(), key(), info(), binary(), unicode:unicode_binary()
+    ) -> {id(), rev()}.
+upload_attachment(Db, Key, Name, Data, Info) when is_atom(Db) ->
+    upload_attachment(atom_to_binary(Db), Key, Name, Data, Info);
+upload_attachment(Db0, Key0, Name0, Data, #{url:=Url0}) ->
+    Db1 = cow_qs:urlencode(Db0),
+    Db = <<"/", Db1/binary>>,
+    Key1 = cow_qs:urlencode(Key0),
+    Key = <<"/", Key1/binary>>,
+    Name1 = cow_qs:urlencode(Name0),
+    Name = <<"/", Name1/binary>>,
+    Url = <<Url0/binary, Db/binary, Key/binary, Name/binary>>,
+    Res = httpc:request(put, {Url, [], "application/octet-stream", Data}, [], [{body_format, binary}]),
+    case Res of
+        {ok, {{_, Stat, _}, _, Body}} when 200=<Stat,Stat=<299 ->
+            #{<<"ok">>:=true,<<"id">>:=Id,<<"rev">>:=Rev} = jsone:decode(Body),
+            {Id, Rev};
+        {ok, {{_, 404, _}, _, _}} ->
+            error(not_found);
+        {ok, {{_, 409, _}, _, _}} ->
+            error(conflict)
+    end.
+
+
 
 -spec time_now() -> unicode:unicode_binary().
 time_now() ->
