@@ -10,7 +10,7 @@ embeddings for erlang
 
 ```
 {deps, [
-    {embe, {git, "https://github.com/ts-klassen/embe.git", {tag, "0.1.2"}}}
+    {embe, {git, "https://github.com/ts-klassen/embe.git", {tag, "1.0.0"}}}
 ]}.
 ```
 
@@ -55,16 +55,17 @@ If you are only using the `embe_vector_db` module, use `embe_vector_db:init/0` i
 ### embe
 
 ```
-1> Test = embe:new(test).
-#{distance => cosine,model => <<"text-embedding-3-large">>,
-  name => test,size => 3072}
-2> embe:create_db(Test).
+1> Test = embe:new().
+#{collection => <<"embe-3072-cosine-text-embedding-3-large">>,
+  distance => cosine,
+  embeddings_function => #Fun<embe.0.41628754>,
+  model => <<"text-embedding-3-large">>,
+  name => <<"_embe_default_namespace">>,size => 3072}
+2> embe:add(<<"This is a test.">>, Test).
 ok
-3> embe:add(<<"This is a test.">>, Test).
+3> embe:add(<<"This is an example.">>, Test).
 ok
-4> embe:add(<<"This is an example.">>, Test).
-ok
-5> embe:search(<<"For experimental purposes">>, 2, Test). 
+4> embe:search(<<"For experimental purposes">>, 2, Test). 
 [<<"This is a test.">>,<<"This is an example.">>]
 ```
 
