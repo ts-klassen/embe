@@ -10,7 +10,7 @@ embeddings for erlang
 
 ```
 {deps, [
-    {embe, {git, "https://github.com/ts-klassen/embe.git", {tag, "1.0.0"}}}
+    {embe, {git, "https://github.com/ts-klassen/embe.git", {tag, "2.0.0"}}}
 ]}.
 ```
 
