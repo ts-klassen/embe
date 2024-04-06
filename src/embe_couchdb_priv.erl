@@ -171,7 +171,7 @@ upsert_(Db, Key, Fun, Info, Retry) ->
         _ -> Data3#{<<"C">>=>TimeNow}
     end,
     try
-        post(Db, Data)
+        post(Db, Data, Info)
     of
         {Id, Rev} ->
             Data#{
