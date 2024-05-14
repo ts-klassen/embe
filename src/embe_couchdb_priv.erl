@@ -146,7 +146,7 @@ update(Db, Key, Fun0, Info) ->
         ({value, Data}) ->
             Fun0(Data)
     end,
-    upsert_(Db, Key, Fun, Info, 10).
+    upsert_(Db, Key, Fun, Info, 1).
 
 -spec upsert(db(), key(), upsert_function()) -> payload().
 upsert(Db, Key, Fun) ->
@@ -155,9 +155,9 @@ upsert(Db, Key, Fun) ->
 -spec upsert(db(), key(), upsert_function(), info()
     ) -> payload().
 upsert(Db, Key, Fun, Info) ->
-    upsert_(Db, Key, Fun, Info, 10).
+    upsert_(Db, Key, Fun, Info, 1).
 
-upsert_(_Db, _Key, _Fun, _Info, ReTry) when ReTry =< 0 ->
+upsert_(_Db, _Key, _Fun, _Info, ReTry) when ReTry >= 10 ->
     error(too_many_retry);
 upsert_(Db, Key, Fun, Info, Retry) ->
     MaybeData = lookup(Db, Key, Info),
@@ -180,14 +180,14 @@ upsert_(Db, Key, Fun, Info, Retry) ->
             }
     catch
         error:conflict ->
-            timer:sleep(100),
-            upsert_(Db, Key, Fun, Info, Retry-1);
+            sleep(Retry),
+            upsert_(Db, Key, Fun, Info, Retry+1);
         throw:Error ->
             throw(Error);
         Class:Error:Stack ->
             spawn(fun()-> erlang:raise(Class,Error,Stack) end),
-            timer:sleep(500),
-            upsert_(Db, Key, Fun, Info, Retry-5)
+            sleep(Retry),
+            upsert_(Db, Key, Fun, Info, Retry+5)
     end.
 
 
@@ -292,4 +292,7 @@ db_info() ->
             list_to_binary(Str)
     end,
     #{url=>Url}.
+
+sleep(Stage) ->
+    timer:sleep(round(1000 * rand:uniform() + 100 * math:exp(Stage))).
 
