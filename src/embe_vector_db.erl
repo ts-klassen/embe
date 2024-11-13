@@ -3,24 +3,33 @@
 -export([
         init/0
       , create_collection/3
-      , upsert_point/3
+      , insert/2
+      , insert/3
+      , insert/4
+      , update/3
+      , update/4
+      , upsert/4
       , search/2
       , search/3
       , vector_hash/1
       , collection_exist/1
+      , uuid/0
     ]).
 -export_type([
         collection_name/0
+      , id/0
       , distance/0
       , vector/0
       , payload/0
       , search_option/0
+      , update_function/0
       , upsert_function/0
     ]).
 
 % https://qdrant.github.io/qdrant/redoc/index.html
 
 -type collection_name() :: atom().
+-type id() :: unicode:unicode_binary().
 -type distance() :: dot | cosine.
 -type vector() :: [float(), ...].
 -type payload() :: map().
@@ -29,6 +38,7 @@
       , exact => false | true | remove
       , score => false | true
     }.
+-type update_function() :: fun((payload())->payload()).
 -type upsert_function() :: fun((klsn:maybe(payload()))->payload()).
 
 -spec init() -> ok.
@@ -49,7 +59,6 @@ create_collection(Name, Size, Dist) ->
         '_id' => Name
       , version => 1
       , type => collection
-      , latest_id => -1
       , size => Size
       , distance => Dist
       , exists => false
@@ -70,61 +79,119 @@ create_collection(Name, Size, Dist) ->
     ok.
 
 
--spec upsert_point(
-        collection_name(), vector(), upsert_function()
+-spec insert(
+        collection_name(), vector()
+    ) -> id().
+insert(Name, Vector) ->
+    Id = uuid(),
+    insert(Name, Id, #{}, Vector),
+    Id.
+
+
+-spec insert(
+        collection_name(), payload(), vector()
+    ) -> id().
+insert(Name, Payload, Vector) ->
+    Id = uuid(),
+    insert(Name, Id, Payload, Vector),
+    Id.
+
+
+-spec insert(
+        collection_name(), id(), payload(), vector()
     ) -> payload().
-upsert_point(Name, Vector, Fun) when is_atom(Name) ->
-    upsert_point(atom_to_binary(Name), Vector, Fun);
-upsert_point(Name, Vector, Fun) ->
-    Hash = vector_hash(Vector),
-    CouchId = <<Name/binary, ":", Hash/binary>>,
+insert(Name, Id, Payload, Vector) ->
+    upsert(Name, Id, fun
+        (none) -> Payload;
+        (_) -> erlang:error(exists)
+    end, {value, Vector}).
+
+
+-spec update(
+        collection_name(), id(), update_function()
+    ) -> payload().
+update(Name, Id, Fun) ->
+    upsert(Name, Id, fun
+        ({value, Doc}) -> Fun(Doc);
+        (_) -> erlang:error(not_found)
+    end, none).
+
+
+-spec update(
+        collection_name(), id(), update_function(), vector()
+    ) -> payload().
+update(Name, Id, Fun, Vector) ->
+    upsert(Name, Id, fun
+        ({value, Doc}) -> Fun(Doc);
+        (_) -> erlang:error(not_found)
+    end, {value, Vector}).
+
+-spec upsert(
+        collection_name(), id(), upsert_function(), klsn:maybe(vector())
+    ) -> payload().
+upsert(Name, Id, Fun, MaybeVector) when is_atom(Name) ->
+    upsert(atom_to_binary(Name), Id, Fun, MaybeVector);
+upsert(Name, Id, Fun, MaybeVector) when is_integer(Id) ->
+    upsert(Name, integer_to_binary(Id), Fun, MaybeVector);
+upsert(Name, Id, Fun, MaybeVector) ->
+    CouchId = <<Name/binary, ":", Id/binary>>,
     Payload = embe_couchdb_priv:upsert(?MODULE, CouchId, fun
         (none) ->
             Doc = Fun(none),
-            #{  <<"latest_id">>:=QdrantId
-            } = embe_couchdb_priv:update(?MODULE, Name, fun(Meta) ->
-                #{<<"latest_id">>:=LatestId} = Meta,
-                Meta#{<<"latest_id">>:=LatestId+1}
-            end),
-            Doc#{<<"id">> => QdrantId};
+            case MaybeVector of
+                {value, _} ->
+                    ok;
+                _ ->
+                    erlang:error(vector_required)
+            end,
+            Doc;
         ({value, Doc}) ->
             Fun({value, Doc})
     end),
-    embe_qdrant_rest_priv:create_point(Name, #{points=>[#{
-        id => maps:get(<<"id">>, Payload)
-      , vector => Vector
-      , payload => Payload
-    }]}),
+    case MaybeVector of
+        {value, Vector} ->
+            embe_qdrant_rest_priv:create_point(Name, #{points=>[#{
+                id => Id
+              , vector => Vector
+              , payload => Payload
+            }]});
+        _ ->
+            embe_qdrant_rest_priv:update_payload(Name, #{
+                points => [Id]
+              , payload => Payload
+            })
+    end,
     Payload.
 
 -spec search(collection_name(), vector()) -> [payload()].
 search(Name, Vect) ->
     search(Name, Vect, #{q=>#{top=>10}}).
 
--spec search(collection_name(), vector(), search_option()) -> [payload()].
+-spec search(collection_name(), id() | vector(), search_option()) -> [payload()].
 search(Name, Vect, Opt) when is_atom(Name) ->
     search(atom_to_binary(Name), Vect, Opt);
 search(Name, Vect, Opt=#{q:=Query}) ->
-    #{<<"result">>:=Res} = embe_qdrant_rest_priv:search(Name, Query#{
-        vector => Vect
+    #{<<"result">>:=Res} = embe_qdrant_rest_priv:points_query(Name, Query#{
+        'query' => Vect
       , with_payload => true
     }),
-    lists:filtermap(fun(#{<<"payload">>:=Payload0, <<"score">>:=Score}) ->
-        Payload = case Opt of
-            #{score:=true} ->
-                Payload0#{<<"_score">>=>Score};
-            _ ->
-                Payload0
-        end,
-        case {Opt, Score} of
-            {#{exact:=true}, N} when N < 0.999999999999 ->
-                false;
-            {#{exact:=remove}, N} when N > 0.999999999999 ->
-                false;
-            _ ->
-                {true, Payload}
+    lists:filtermap(fun
+        (#{<<"payload">>:=Payload0, <<"score">>:=Score}) ->
+            Payload = case Opt of
+                #{score:=true} ->
+                    Payload0#{<<"_score">>=>Score};
+                _ ->
+                    Payload0
+            end,
+            case {Opt, Score} of
+                {#{exact:=true}, N} when N < 0.999999999999 ->
+                    false;
+                {#{exact:=remove}, N} when N > 0.999999999999 ->
+                    false;
+                _ ->
+                    {true, Payload}
         end
-    end, Res).
+    end, maps:get(<<"points">>, Res)).
 
 -spec collection_exist(collection_name()) -> boolean().
 collection_exist(Name) when is_atom(Name) ->
@@ -134,6 +201,16 @@ collection_exist(Name) ->
         none -> false;
         _ -> true
     end.
+
+
+-spec uuid() -> id().
+uuid() ->
+    <<R1:48, _:4, R2:12, _:2, R3:62>> = crypto:strong_rand_bytes(16),
+    <<U1:32, U2:16, U3:16, U4:16, U5:48>> = <<R1:48, 0:1, 1:1, 0:1, 0:1, R2:12, 1:1, 0:1, R3:62>>,
+    iolist_to_binary(io_lib:format(
+        "~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",
+        [U1, U2, U3, U4, U5])
+    ).
 
 vector_hash(List) when is_list(List) ->
     list_to_binary(string:lowercase(binary_to_list(binary:encode_hex(crypto:hash(sha256, term_to_binary(List)))))).

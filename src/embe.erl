@@ -5,19 +5,21 @@
       , new/0
       , new/1
       , add/2
-      , upsert/3
+      , update/3
+      , update/4
       , search/2
       , search/3
-      , verbose_search/2
-      , verbose_search/3
-      , hash/1
     ]).
 
 -export_type([
         embeddings/0
       , namespace/0
       , metadata/0
+      , update_function/0
       , upsert_function/0
+      , id/0
+      , key/0
+      , search_option/0
     ]).
 
 -type embeddings() :: #{
@@ -31,24 +33,34 @@
 
 -type namespace() :: atom() | unicode:unicode_binary().
 
--type metadata() :: map().
+-type metadata() :: #{
+        input := unicode:unicode_binary()
+      , key() => key()
+    }.
+
+-type update_function() :: fun((metadata())->metadata()).
 
 -type upsert_function() :: fun((klsn:maybe(metadata()))->metadata()).
+
+-type id() :: unicode:unicode_binary().
+
+-type key() :: atom() | unicode:unicode_binary().
+
+-type search_option() :: #{
+        limit => pos_integer()
+      , filter => [{key(), key() | [key()]}]
+    }.
 
 -spec init_setup() -> ok.
 init_setup() ->
     embe_vector_db:init(),
-    try embe_couchdb_priv:create_db(?MODULE) of
-        _ -> ok
-    catch
-        error:exists -> ok
-    end,
-    create_db(new(<<>>)),
+    % For default text-embedding-3-large model.
+    create_db(new()),
     ok.
 
 -spec new() -> embeddings().
 new() ->
-    new(<<"_embe_default_namespace">>).
+    new(<<"embe_default_namespace">>).
 
 -spec new(namespace()) -> embeddings().
 new(Name) ->
@@ -60,7 +72,7 @@ new(Name) ->
       , name => Name
       , collection => <<"embe-3072-cosine-", Model/binary>>
       , embeddings_function => fun(Input) ->
-            embed(Model, Input)
+            gpte_embeddings:simple(Input, Model)
         end
     }.
 
@@ -73,110 +85,91 @@ create_db(#{size:=Size, collection:=Collection, distance:=Distance}) ->
     end.
 
 -spec add(
-        unicode:unicode_binary(), embeddings()
-   ) -> ok | {error, exists}.
-add(Input, #{name:=Name, collection:=Collection, embeddings_function:=T2V}) ->
+        metadata()
+      , embeddings()
+   ) -> id().
+add(MetaData, Opts=#{name:=Name, collection:=Collection, model:=Model, embeddings_function:=T2V}) ->
+    Input = case MetaData of
+        #{ input := Input0 } -> Input0;
+        #{ <<"input">> := Input0 } -> Input0;
+        _ -> erlang:error(badarg, [MetaData, Opts])
+    end,
     Vector = T2V(Input),
     NameSpace = to_binary(Name),
-    try embe_vector_db:upsert_point(Collection, Vector, fun
-        ({value, #{<<"namespace">>:=#{NameSpace:=[_]}}}) ->
-            erlang:throw({?MODULE, exists});
-        ({value, Doc}) ->
-            Payload = #{input=>Input, meta=>#{}},
-            klsn_map:upsert([<<"namespace">>, NameSpace], [Payload], Doc);
-        (none) -> #{
-            namespace => #{
-                Name => [#{input=>Input, meta=>#{}}]
-            }}
-    end) of
-        _ ->
-            ok
-    catch
-        throw:{?MODULE, exists} ->
-            {error, exists}
-    end.
+    embe_vector_db:insert(Collection, #{
+        namespace => NameSpace
+      , metadata => MetaData
+      , model => Model
+      , version => 1
+    }, Vector).
 
--spec upsert(
-        unicode:unicode_binary(), upsert_function(), embeddings()
+-spec update(
+        id(), update_function(), embeddings()
    ) -> metadata().
-upsert(Input, Fun, #{name:=Name, collection:=Collection, embeddings_function:=T2V}) ->
-    Vector = T2V(Input),
+update(Id, Fun, #{name:=Name, collection:=Collection}) ->
     NameSpace = to_binary(Name),
-    case embe_vector_db:upsert_point(Collection, Vector, fun
-        ({value, Doc=#{<<"namespace">>:=#{NameSpace:=[Payload0]}}}) ->
-            #{<<"meta">>:=Meta} = Payload0,
-            Payload = Payload0#{<<"meta">>=>Fun({value, Meta})},
-            klsn_map:upsert([<<"namespace">>, NameSpace], [Payload], Doc);
-        ({value, Doc}) ->
-            Payload = #{input=>Input, <<"meta">>=>Fun(none)},
-            klsn_map:upsert([<<"namespace">>, NameSpace], [Payload], Doc);
-        (none) -> #{
-            <<"namespace">> => #{
-                NameSpace => [#{input=>Input, <<"meta">>=>Fun(none)}]
-            }}
-    end) of
-        #{<<"namespace">>:=#{NameSpace:=[#{<<"meta">>:=Res}]}} ->
-            Res
-    end.
+    Payload = embe_vector_db:update(Collection, Id, fun
+        (#{<<"metadata">>:=Metadata, <<"namespace">>:=NS}=Doc) when NS =:= NameSpace ->
+            Doc#{<<"metadata">>:=Fun(Metadata)};
+        (_) ->
+            erlang:error(not_found)
+    end),
+    maps:get(<<"metadata">>, Payload).
+
+-spec update(
+        id(), update_function(), unicode:unicode_binary(), embeddings()
+   ) -> metadata().
+update(Id, Input, Fun, #{name:=Name, collection:=Collection, embeddings_function:=T2V}) ->
+    NameSpace = to_binary(Name),
+    Payload = embe_vector_db:update(Collection, Id, fun
+        (#{<<"metadata">>:=Metadata, <<"namespace">>:=NS}=Doc) when NS =:= NameSpace ->
+            Doc#{<<"metadata">>:=Fun(Metadata), <<"input">>:=Input};
+        (_) ->
+            erlang:error(not_found)
+    end, T2V(Input)),
+    maps:get(<<"metadata">>, Payload).
 
 -spec search(
-        unicode:unicode_binary(), embeddings()
+        id(), embeddings()
     ) -> [unicode:unicode_binary()].
 search(Input, Opt) ->
-    search(Input, 1, Opt).
+    search(Input, #{}, Opt).
 
 -spec search(
-        unicode:unicode_binary(), non_neg_integer(), embeddings()
+        id(), search_option(), embeddings()
     ) -> [unicode:unicode_binary()].
-search(Input, Top, Opt) ->
-    lists:map(fun({Text, _})->Text end, verbose_search(Input, Top, Opt)).
-
--spec verbose_search(
-        unicode:unicode_binary(), embeddings()
-    ) -> [{unicode:unicode_binary(), metadata()}].
-verbose_search(Input, Opt) ->
-    verbose_search(Input, 1, Opt).
-
--spec verbose_search(
-        unicode:unicode_binary(), non_neg_integer(), embeddings()
-    ) -> [{unicode:unicode_binary(), metadata()}].
-verbose_search(Input, Top, #{name:=Name, collection:=Collection, embeddings_function:=T2V}) ->
-    Vector = T2V(Input),
-    NameSpace = to_binary(Name),
-    Opt = #{q=>#{
-        top => Top
-      , filter => #{must => [#{
-            key => <<"namespace.", NameSpace/binary>>
-          , values_count => #{
-                eq => 1
+search(Id, SearchOption0, #{name:=Name, collection:=Collection}) ->
+    SearchOption10 = maps:merge(#{
+        limit => 10
+    }, SearchOption0),
+    Filter = case SearchOption10 of
+        #{filter := Fltr} ->
+            lists:map(fun
+                ({Key, Any}) when is_list(Any) ->
+                    #{
+                        key => nest([metadata, Key])
+                      , match => #{ any => Any }
+                    };
+                ({Key, Value}) ->
+                    #{
+                        key => nest([metadata, Key])
+                      , match => #{ value => Value }
+                    }
+            end, Fltr);
+        _ ->
+            []
+    end,
+    embe_vector_db:search(Collection, Id, #{
+        q => #{
+            limit => maps:get(limit, SearchOption10)
+          , filter => #{
+                must => [
+                    #{key => <<"namespace">>, match => #{value => Name}}
+                | Filter]
             }
-        }]}
-    }},
-    List = embe_vector_db:search(Collection, Vector, Opt),
-    lists:map(fun(#{<<"namespace">>:=#{NameSpace:=[Res]}})->
-        #{<<"input">>:=ResInput, <<"meta">>:=ResMeta} = Res,
-        {ResInput, ResMeta}
-    end, List).
-
-embed(Model, Input) ->
-    Hash = hash(Input),
-    Key = <<Model/binary, ":", Hash/binary>>,
-    case embe_couchdb_priv:lookup_attachment(?MODULE, Key, <<"vector">>) of
-        {value, Vector} ->
-            binary_to_term(zlib:uncompress(Vector));
-        none ->
-            Vector = gpte_embeddings:simple(Input, Model),
-            spawn(fun()->
-                Data = zlib:compress(term_to_binary(Vector)),
-                embe_couchdb_priv:upload_attachment(?MODULE, Key, <<"vector">>, Data),
-                embe_couchdb_priv:update(?MODULE, Key, fun(Doc) -> Doc#{
-                    version => 1
-                  , model => Model
-                  , input => Input
-                } end)
-            end),
-            Vector
-    end.
+        }
+      , score => true
+    }).
 
 to_binary(Name) ->
     case Name of
@@ -186,5 +179,8 @@ to_binary(Name) ->
             NS
     end.
 
-hash(Term) ->
-    list_to_binary(string:lowercase(binary_to_list(binary:encode_hex(crypto:hash(sha256, term_to_binary(Term)))))).
+-spec nest([key()]) -> unicode:unicode_binary().
+nest(Path0) ->
+    Path10 = lists:map(fun to_binary/1, Path0),
+    iolist_to_binary(lists:join(<<".">>, Path10)).
+

@@ -4,7 +4,7 @@
   0},
  {<<"gpte">>,
   {git,"https://github.com/ts-klassen/gpte.git",
-       {ref,"96fc8e0f1915c35b87c8039e122f243a1abb2b50"}},
+       {ref,"081408d0788ccc156c8843bcb85e933d2350062c"}},
   0},
  {<<"jsone">>,
   {git,"https://github.com/sile/jsone.git",
