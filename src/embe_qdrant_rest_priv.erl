@@ -7,6 +7,10 @@
       , status/2
       , create_point/2
       , create_point/3
+      , update_payload/2
+      , update_payload/3
+      , points_query/2
+      , points_query/3
       , search/2
       , search/3
     ]).
@@ -94,6 +98,43 @@ create_point(Db0, Data, #{url:=Url0}) ->
     case Res of
         {ok, {{_, Stat, _}, _, _}} when 200=<Stat,Stat=<299 ->
             ok
+    end.
+
+
+-spec update_payload(db(), payload()) -> ok.
+update_payload(Db, Data0) ->
+    update_payload(Db, Data0, db_info()).
+
+-spec update_payload(db(), payload(), info()) -> ok.
+update_payload(Db, Payload, Info) when is_atom(Db) ->
+    update_payload(atom_to_binary(Db), Payload, Info);
+update_payload(Db0, Data, #{url:=Url0}) ->
+    Db1 = cow_qs:urlencode(Db0),
+    Db = <<"/collections/", Db1/binary>>,
+    Url = <<Url0/binary, Db/binary, "/points/payload?wait=true">>,
+    Req = {Url, [], "application/json", jsone:encode(Data)},
+    Res = httpc:request(put, Req, [], [{body_format, binary}]),
+    case Res of
+        {ok, {{_, Stat, _}, _, _}} when 200=<Stat,Stat=<299 ->
+            ok
+    end.
+
+-spec points_query(db(), payload()) -> ok.
+points_query(Db, Data0) ->
+    points_query(Db, Data0, db_info()).
+
+-spec points_query(db(), payload(), info()) -> ok.
+points_query(Db, Payload, Info) when is_atom(Db) ->
+    points_query(atom_to_binary(Db), Payload, Info);
+points_query(Db0, Data, #{url:=Url0}) ->
+    Db1 = cow_qs:urlencode(Db0),
+    Db = <<"/collections/", Db1/binary>>,
+    Url = <<Url0/binary, Db/binary, "/points/query">>,
+    Req = {Url, [], "application/json", jsone:encode(Data)},
+    Res = httpc:request(post, Req, [], [{body_format, binary}]),
+    case Res of
+        {ok, {{_, Stat, _}, _, Body}} when 200=<Stat,Stat=<299 ->
+            jsone:decode(Body)
     end.
 
 -spec search(db(), payload()) -> ok.
