@@ -54,6 +54,7 @@
 -spec init_setup() -> ok.
 init_setup() ->
     embe_vector_db:init(),
+    embe_recommend:init(),
     % For default text-embedding-3-large model.
     create_db(new()),
     ok.
