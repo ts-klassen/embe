@@ -37,6 +37,7 @@
         q := Query :: #{}
       , exact => false | true | remove
       , score => false | true
+      , vector_id => false | true
     }.
 -type update_function() :: fun((payload())->payload()).
 -type upsert_function() :: fun((klsn:maybe(payload()))->payload()).
@@ -176,12 +177,18 @@ search(Name, Vect, Opt=#{q:=Query}) ->
       , with_payload => true
     }),
     lists:filtermap(fun
-        (#{<<"payload">>:=Payload0, <<"score">>:=Score}) ->
-            Payload = case Opt of
+        (#{<<"id">>:=VectorId,<<"payload">>:=Payload0, <<"score">>:=Score}) ->
+            Payload10 = case Opt of
                 #{score:=true} ->
                     Payload0#{<<"_score">>=>Score};
                 _ ->
                     Payload0
+            end,
+            Payload = case Opt of
+                #{vector_id:=true} ->
+                    Payload10#{<<"_vector_id">>=>VectorId};
+                _ ->
+                    Payload10
             end,
             case {Opt, Score} of
                 {#{exact:=true}, N} when N < 0.999999999999 ->
