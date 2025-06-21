@@ -43,7 +43,7 @@
 
 -spec init() -> ok.
 init() ->
-    try embe_couchdb_priv:create_db(?MODULE) of
+    try klsn_db:create_db(?MODULE) of
         _ -> ok
     catch
         error:exists -> ok
@@ -55,7 +55,7 @@ init() ->
 create_collection(Name, Size, Dist) when is_atom(Name) ->
     create_collection(atom_to_binary(Name), Size, Dist);
 create_collection(Name, Size, Dist) ->
-    embe_couchdb_priv:create_doc(?MODULE, #{
+    klsn_db:create_doc(?MODULE, #{
         '_id' => Name
       , version => 1
       , type => collection
@@ -73,7 +73,7 @@ create_collection(Name, Size, Dist) ->
           , distance => DistName
         }
     }),
-    embe_couchdb_priv:update(?MODULE, Name, fun(Doc) ->
+    klsn_db:update(?MODULE, Name, fun(Doc) ->
         Doc#{<<"exists">>:=true}
     end),
     ok.
@@ -135,7 +135,7 @@ upsert(Name, Id, Fun, MaybeVector) when is_integer(Id) ->
     upsert(Name, integer_to_binary(Id), Fun, MaybeVector);
 upsert(Name, Id, Fun, MaybeVector) ->
     CouchId = <<Name/binary, ":", Id/binary>>,
-    Payload = embe_couchdb_priv:upsert(?MODULE, CouchId, fun
+    Payload = klsn_db:upsert(?MODULE, CouchId, fun
         (none) ->
             Doc = Fun(none),
             case MaybeVector of
@@ -197,7 +197,7 @@ search(Name, Vect, Opt=#{q:=Query}) ->
 collection_exist(Name) when is_atom(Name) ->
     collection_exist(atom_to_binary(Name));
 collection_exist(Name) ->
-    case embe_couchdb_priv:lookup(?MODULE, Name) of
+    case klsn_db:lookup(?MODULE, Name) of
         none -> false;
         _ -> true
     end.
