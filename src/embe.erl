@@ -9,6 +9,11 @@
       , update/4
       , search/2
       , search/3
+      , recommendation_key/1
+      , recommendation_key/2
+      , positive/2
+      , neutral/2
+      , negative/2
     ]).
 
 -export_type([
@@ -20,6 +25,7 @@
       , id/0
       , key/0
       , search_option/0
+      , recommendation_key/0
     ]).
 
 -type embeddings() :: #{
@@ -29,6 +35,7 @@
       , name := namespace()
       , collection := atom() | unicode:unicode_binary()
       , embeddings_function := fun((unicode:unicode_binary())->[float()])
+      , recommendation_key := recommendation_key()
     }.
 
 -type namespace() :: atom() | unicode:unicode_binary().
@@ -50,6 +57,8 @@
         limit => pos_integer()
       , filter => [{key(), key() | [key()]}]
     }.
+
+-type recommendation_key() :: atom() | unicode:unicode_binary().
 
 -spec init_setup() -> ok.
 init_setup() ->
@@ -75,6 +84,7 @@ new(Name) ->
       , embeddings_function => fun(Input) ->
             gpte_embeddings:simple(Input, Model)
         end
+      , recommendation_key => <<"embe_default_recommendation_key">>
     }.
 
 -spec create_db(embeddings()) -> ok.
@@ -171,6 +181,27 @@ search(Id, SearchOption0, #{name:=Name, collection:=Collection}) ->
         }
       , score => true
     }).
+
+-spec recommendation_key(embeddings()) -> recommendation_key().
+recommendation_key(Embe) ->
+    klsn_map:get([recommendation_key], Embe).
+
+-spec recommendation_key(recommendation_key(), embeddings()) -> embeddings().
+recommendation_key(Key, Embe) ->
+    klsn_map:upsert([recommendation_key], Key, Embe).
+
+-spec positive(id(), embeddings()) -> ok.
+positive(Id, #{collection:=K1, name:=K2, recommendation_key:=K3}) ->
+    embe_recommend:positive({K1, K2, K3}, Id).
+
+-spec neutral(id(), embeddings()) -> ok.
+neutral(Id, #{collection:=K1, name:=K2, recommendation_key:=K3}) ->
+    embe_recommend:neutral({K1, K2, K3}, Id).
+
+-spec negative(id(), embeddings()) -> ok.
+negative(Id, #{collection:=K1, name:=K2, recommendation_key:=K3}) ->
+    embe_recommend:negative({K1, K2, K3}, Id).
+
 
 to_binary(Name) ->
     case Name of
