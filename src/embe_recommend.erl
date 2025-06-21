@@ -21,8 +21,8 @@
 -type key() :: {collection_name(), namespace(), id()}.
 -type recommend() :: #{
         recommend := #{
-            positive => []
-          , negative => []
+            positive => [embe:id()]
+          , negative => [embe:id()]
         } 
     }.
 
