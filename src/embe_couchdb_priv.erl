@@ -56,7 +56,7 @@ create_db(Db) ->
 create_db(Db, Info) when is_atom(Db) ->
     create_db(atom_to_binary(Db), Info);
 create_db(Db0, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/", Db1/binary>>,
     Url = <<Url0/binary, Db/binary>>,
     Res = httpc:request(put, {Url, []}, [], [{body_format, binary}]),
@@ -98,9 +98,9 @@ lookup(Db, Key) ->
 lookup(Db, Key, Info) when is_atom(Db) ->
     lookup(atom_to_binary(Db), Key, Info);
 lookup(Db0, Key0, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/", Db1/binary>>,
-    Key1 = cow_qs:urlencode(Key0),
+    Key1 = klsn_binstr:urlencode(Key0),
     Key = <<"/", Key1/binary>>,
     Url = <<Url0/binary, Db/binary, Key/binary>>,
     Res = httpc:request(get, {Url, []}, [], [{body_format, binary}]),
@@ -119,7 +119,7 @@ post(Db, Payload) ->
 post(Db, Payload, Info) when is_atom(Db) ->
     post(atom_to_binary(Db), Payload, Info);
 post(Db0, Payload0, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/", Db1/binary>>,
     Payload = jsone:encode(Payload0),
     Url = <<Url0/binary, Db/binary>>,
@@ -203,11 +203,11 @@ lookup_attachment(Db, Key, Name) ->
 lookup_attachment(Db, Key, Name, Info) when is_atom(Db) ->
     lookup_attachment(atom_to_binary(Db), Key, Name, Info);
 lookup_attachment(Db0, Key0, Name0, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/", Db1/binary>>,
-    Key1 = cow_qs:urlencode(Key0),
+    Key1 = klsn_binstr:urlencode(Key0),
     Key = <<"/", Key1/binary>>,
-    Name1 = cow_qs:urlencode(Name0),
+    Name1 = klsn_binstr:urlencode(Name0),
     Name = <<"/", Name1/binary>>,
     Url = <<Url0/binary, Db/binary, Key/binary, Name/binary>>,
     Res = httpc:request(get, {Url, []}, [], [{body_format, binary}]),
@@ -231,11 +231,11 @@ upload_attachment(Db, Key, Name, Data) ->
 upload_attachment(Db, Key, Name, Data, Info) when is_atom(Db) ->
     upload_attachment(atom_to_binary(Db), Key, Name, Data, Info);
 upload_attachment(Db0, Key0, Name0, Data, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/", Db1/binary>>,
-    Key1 = cow_qs:urlencode(Key0),
+    Key1 = klsn_binstr:urlencode(Key0),
     Key = <<"/", Key1/binary>>,
-    Name1 = cow_qs:urlencode(Name0),
+    Name1 = klsn_binstr:urlencode(Name0),
     Name = <<"/", Name1/binary>>,
     Url = <<Url0/binary, Db/binary, Key/binary, Name/binary>>,
     Res = httpc:request(put, {Url, [], "application/octet-stream", Data}, [], [{body_format, binary}]),
