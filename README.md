@@ -58,15 +58,17 @@ If you are only using the `embe_vector_db` module, use `embe_vector_db:init/0` i
 1> Test = embe:new().
 #{collection => <<"embe-3072-cosine-text-embedding-3-large">>,
   distance => cosine,
-  embeddings_function => #Fun<embe.0.41628754>,
+  embeddings_function => #Fun<embe.0.65375742>,
   model => <<"text-embedding-3-large">>,
-  name => <<"_embe_default_namespace">>,size => 3072}
-2> embe:add(<<"This is a test.">>, Test).
-ok
-3> embe:add(<<"This is an example.">>, Test).
-ok
-4> embe:search(<<"For experimental purposes">>, 2, Test). 
-[<<"This is a test.">>,<<"This is an example.">>]
+  name => <<"embe_default_namespace">>,
+  recommendation_key => <<"embe_default_recommendation_key">>,
+  size => 3072}
+2> embe:add(#{input => <<"This is a test.">>}, Test).
+<<"cbea8ed7-aa16-418c-a01b-89c6aad876cd">>
+3> embe:add(#{input => <<"This is an example.">>}, Test).
+<<"9b6c04ee-ea52-42b1-82df-874d61040bd1">>
+4> embe:search(<<"cbea8ed7-aa16-418c-a01b-89c6aad876cd">>, #{id_only => true}, Test). 
+[<<"9b6c04ee-ea52-42b1-82df-874d61040bd1">>]
 ```
 
 ### embe_vector_db
@@ -74,30 +76,22 @@ ok
 ```
 1> embe_vector_db:create_collection(another_test, 3, cosine).
 ok
-2> embe_vector_db:upsert_point(another_test, [1,2,3], fun(none) ->
-2>     #{count => 1}   
-2> end).
-#{count => 1,<<"C">> => <<"2024-03-26T21:36:17.696+09:00">>,
-  <<"U">> => <<"2024-03-26T21:36:17.696+09:00">>,
-  <<"_id">> =>
-      <<"another_test:e515da7d686fcae57d60be8936538ae14061d53b3ffc66388da76391a6424ac5">>,
-  <<"_rev">> => <<"1-649f0f712ca18429649975fe7dc1a6c0">>,
-  <<"id">> => 0}
-3> embe_vector_db:upsert_point(another_test, [1,2,3], fun({value, Doc}) ->    
-3>     Count = maps:get(<<"count">>, Doc),
+2> Id = embe_vector_db:insert(another_test, #{count => 1}, [1,2,3]).
+<<"20a33107-2d68-449e-b7ae-a51f52bd50e8">>
+3> embe_vector_db:update(another_test, Id, fun(Doc=#{<<"count">>:=Count}) ->
 3>     Doc#{<<"count">> => Count+1}
 3> end).
-#{<<"C">> => <<"2024-03-26T21:36:17.696+09:00">>,
-  <<"U">> => <<"2024-03-26T21:40:37.759+09:00">>,
+#{<<"C">> => <<"2025-06-21T20:47:01.331+09:00">>,
+  <<"U">> => <<"2025-06-21T20:50:02.892+09:00">>,
   <<"_id">> =>
-      <<"another_test:e515da7d686fcae57d60be8936538ae14061d53b3ffc66388da76391a6424ac5">>,
-  <<"_rev">> => <<"2-200d0682817bc7a002d4582ffa1c8ae5">>,
-  <<"count">> => 2,<<"id">> => 0}
+      <<"another_test:20a33107-2d68-449e-b7ae-a51f52bd50e8">>, 
+  <<"_rev">> => <<"2-cb4acb0b9b0c108500310f0554ea122c">>,
+  <<"count">> => 2}
 4> embe_vector_db:search(another_test, [1,2,3]).
-[#{<<"C">> => <<"2024-03-26T21:36:17.696+09:00">>,
-   <<"U">> => <<"2024-03-26T21:40:37.759+09:00">>,
+[#{<<"C">> => <<"2025-06-21T20:47:01.331+09:00">>,
+   <<"U">> => <<"2025-06-21T20:50:02.892+09:00">>,
    <<"_id">> =>
-       <<"another_test:e515da7d686fcae57d60be8936538ae14061d53b3ffc66388da76391a6424ac5">>,
-   <<"_rev">> => <<"2-200d0682817bc7a002d4582ffa1c8ae5">>,
-   <<"count">> => 2,<<"id">> => 0}]
+       <<"another_test:20a33107-2d68-449e-b7ae-a51f52bd50e8">>,
+   <<"_rev">> => <<"2-cb4acb0b9b0c108500310f0554ea122c">>,
+   <<"count">> => 2}]
 ```
