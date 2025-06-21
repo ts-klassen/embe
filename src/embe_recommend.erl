@@ -13,6 +13,7 @@
       , namespace/0
       , id/0
       , key/0
+      , recommend/0
     ]).
 
 -type collection_name() :: atom() | unicode:unicode_binary().
@@ -21,8 +22,8 @@
 -type key() :: {collection_name(), namespace(), id()}.
 -type recommend() :: #{
         recommend := #{
-            positive => [embe:id()]
-          , negative => [embe:id()]
+            positive := [embe:id()]
+          , negative := [embe:id()]
         } 
     }.
 
@@ -46,7 +47,7 @@ lookup(Key) ->
         none ->
             none;
         {value, Doc} ->
-            maybe_to_recommend({value, Doc})
+            {value, #{recommend => maps:get(recommend, maybe_to_recommend({value, Doc}))}}
     end.
 
 -spec positive(key(), embe:id()) -> ok. 
@@ -117,7 +118,8 @@ maybe_to_recommend(Maybe) ->
         {value, Rec=#{recommend:=_}} ->
             Rec;
         {value, Doc} ->
-            #{
+            Removed = maps:remove(<<"recommend">>, Doc),
+            Removed#{
                 recommend => #{
                     positive => klsn_map:get([<<"recommend">>, <<"positive">>], Doc, [])
                   , negative => klsn_map:get([<<"recommend">>, <<"negative">>], Doc, [])

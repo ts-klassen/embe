@@ -9,6 +9,13 @@
       , update/4
       , search/2
       , search/3
+      , recommendation_key/1
+      , recommendation_key/2
+      , positive/2
+      , neutral/2
+      , negative/2
+      , recommendations/1
+      , recommendations/2
     ]).
 
 -export_type([
@@ -20,6 +27,8 @@
       , id/0
       , key/0
       , search_option/0
+      , search_result/0
+      , recommendation_key/0
     ]).
 
 -type embeddings() :: #{
@@ -29,6 +38,7 @@
       , name := namespace()
       , collection := atom() | unicode:unicode_binary()
       , embeddings_function := fun((unicode:unicode_binary())->[float()])
+      , recommendation_key := recommendation_key()
     }.
 
 -type namespace() :: atom() | unicode:unicode_binary().
@@ -49,7 +59,14 @@
 -type search_option() :: #{
         limit => pos_integer()
       , filter => [{key(), key() | [key()]}]
+      , id_only => boolean() % default false
     }.
+
+-type search_result() :: [id() | #{
+
+    }].
+
+-type recommendation_key() :: atom() | unicode:unicode_binary().
 
 -spec init_setup() -> ok.
 init_setup() ->
@@ -75,6 +92,7 @@ new(Name) ->
       , embeddings_function => fun(Input) ->
             gpte_embeddings:simple(Input, Model)
         end
+      , recommendation_key => <<"embe_default_recommendation_key">>
     }.
 
 -spec create_db(embeddings()) -> ok.
@@ -132,18 +150,15 @@ update(Id, Input, Fun, #{name:=Name, collection:=Collection, embeddings_function
 
 -spec search(
         id(), embeddings()
-    ) -> [unicode:unicode_binary()].
+    ) -> search_result().
 search(Input, Opt) ->
     search(Input, #{}, Opt).
 
 -spec search(
         id(), search_option(), embeddings()
-    ) -> [unicode:unicode_binary()].
-search(Id, SearchOption0, #{name:=Name, collection:=Collection}) ->
-    SearchOption10 = maps:merge(#{
-        limit => 10
-    }, SearchOption0),
-    Filter = case SearchOption10 of
+    ) -> search_result().
+search(Id, SearchOption, #{name:=Name, collection:=Collection}) ->
+    Filter = case SearchOption of
         #{filter := Fltr} ->
             lists:map(fun
                 ({Key, Any}) when is_list(Any) ->
@@ -160,9 +175,9 @@ search(Id, SearchOption0, #{name:=Name, collection:=Collection}) ->
         _ ->
             []
     end,
-    embe_vector_db:search(Collection, Id, #{
+    Result =  embe_vector_db:search(Collection, Id, #{
         q => #{
-            limit => maps:get(limit, SearchOption10)
+            limit => maps:get(limit, SearchOption, 10)
           , filter => #{
                 must => [
                     #{key => <<"namespace">>, match => #{value => Name}}
@@ -170,7 +185,56 @@ search(Id, SearchOption0, #{name:=Name, collection:=Collection}) ->
             }
         }
       , score => true
-    }).
+      , vector_id => true
+    }),
+    lists:map(fun(ResElem=#{<<"_vector_id">>:=VectorId})->
+       case SearchOption of
+           #{id_only := true} ->
+               VectorId;
+           _ ->
+               ResElem#{<<"id">> => VectorId} 
+       end
+    end, Result).
+
+-spec recommendation_query(
+        embeddings()
+    ) -> embe_recommend:recommend() | embe_vector_db:vector().
+recommendation_query(#{collection:=K1, name:=K2, recommendation_key:=K3, size:=S}) ->
+    case embe_recommend:get({K1, K2, K3}) of
+        #{recommend:=#{positive:=[],negative:=[]}} ->
+            lists:duplicate(S, 0.0);
+        Recommend ->
+            Recommend
+    end.
+
+-spec recommendations(embeddings()) -> search_result().
+recommendations(Embe) ->
+    search(recommendation_query(Embe), Embe).
+
+-spec recommendations(search_option(), embeddings()) -> search_result().
+recommendations(Opts, Embe) ->
+    search(recommendation_query(Embe), Opts, Embe).
+
+-spec recommendation_key(embeddings()) -> recommendation_key().
+recommendation_key(Embe) ->
+    klsn_map:get([recommendation_key], Embe).
+
+-spec recommendation_key(recommendation_key(), embeddings()) -> embeddings().
+recommendation_key(Key, Embe) ->
+    klsn_map:upsert([recommendation_key], Key, Embe).
+
+-spec positive(id(), embeddings()) -> ok.
+positive(Id, #{collection:=K1, name:=K2, recommendation_key:=K3}) ->
+    embe_recommend:positive({K1, K2, K3}, Id).
+
+-spec neutral(id(), embeddings()) -> ok.
+neutral(Id, #{collection:=K1, name:=K2, recommendation_key:=K3}) ->
+    embe_recommend:neutral({K1, K2, K3}, Id).
+
+-spec negative(id(), embeddings()) -> ok.
+negative(Id, #{collection:=K1, name:=K2, recommendation_key:=K3}) ->
+    embe_recommend:negative({K1, K2, K3}, Id).
+
 
 to_binary(Name) ->
     case Name of
