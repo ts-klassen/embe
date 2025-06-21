@@ -4,7 +4,7 @@
   0},
  {<<"gpte">>,
   {git,"https://github.com/ts-klassen/gpte.git",
-       {ref,"081408d0788ccc156c8843bcb85e933d2350062c"}},
+       {ref,"dc1d98e5c2d402b9bda299c40a566c3b982ab37c"}},
   0},
  {<<"jsone">>,
   {git,"https://github.com/sile/jsone.git",
@@ -12,5 +12,5 @@
   0},
  {<<"klsn">>,
   {git,"https://github.com/ts-klassen/klsn.git",
-       {ref,"e20f90637770b6ac2e6723552e3581737cefe3bb"}},
+       {ref,"fad276127730bbb5958a9e4a474ba3a7d4a795d5"}},
   0}].

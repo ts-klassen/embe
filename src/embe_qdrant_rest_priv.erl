@@ -49,7 +49,7 @@ create_collection(Db, CollectionPayload) ->
 create_collection(Db, CollectionPayload, Info) when is_atom(Db) ->
     create_collection(atom_to_binary(Db), CollectionPayload, Info);
 create_collection(Db0, CollectionPayload, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/collections/", Db1/binary>>,
     Url = <<Url0/binary, Db/binary>>,
     Req = {Url, [], "application/json", jsone:encode(CollectionPayload)},
@@ -69,7 +69,7 @@ status(Db) ->
 status(Db, Info) when is_atom(Db) ->
     status(atom_to_binary(Db), Info);
 status(Db0, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/collections/", Db1/binary>>,
     Url = <<Url0/binary, Db/binary>>,
     Req = {Url, []},
@@ -90,7 +90,7 @@ create_point(Db, Data0) ->
 create_point(Db, Payload, Info) when is_atom(Db) ->
     create_point(atom_to_binary(Db), Payload, Info);
 create_point(Db0, Data, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/collections/", Db1/binary>>,
     Url = <<Url0/binary, Db/binary, "/points?wait=true">>,
     Req = {Url, [], "application/json", jsone:encode(Data)},
@@ -109,7 +109,7 @@ update_payload(Db, Data0) ->
 update_payload(Db, Payload, Info) when is_atom(Db) ->
     update_payload(atom_to_binary(Db), Payload, Info);
 update_payload(Db0, Data, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/collections/", Db1/binary>>,
     Url = <<Url0/binary, Db/binary, "/points/payload?wait=true">>,
     Req = {Url, [], "application/json", jsone:encode(Data)},
@@ -127,7 +127,7 @@ points_query(Db, Data0) ->
 points_query(Db, Payload, Info) when is_atom(Db) ->
     points_query(atom_to_binary(Db), Payload, Info);
 points_query(Db0, Data, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/collections/", Db1/binary>>,
     Url = <<Url0/binary, Db/binary, "/points/query">>,
     Req = {Url, [], "application/json", jsone:encode(Data)},
@@ -145,7 +145,7 @@ search(Db, Data0) ->
 search(Db, Payload, Info) when is_atom(Db) ->
     search(atom_to_binary(Db), Payload, Info);
 search(Db0, Data, #{url:=Url0}) ->
-    Db1 = cow_qs:urlencode(Db0),
+    Db1 = klsn_binstr:urlencode(Db0),
     Db = <<"/collections/", Db1/binary>>,
     Url = <<Url0/binary, Db/binary, "/points/search">>,
     Req = {Url, [], "application/json", jsone:encode(Data)},
