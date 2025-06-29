@@ -6,6 +6,8 @@
       , insert/2
       , insert/3
       , insert/4
+      , get/2
+      , lookup/2
       , update/3
       , update/4
       , upsert/4
@@ -106,6 +108,26 @@ insert(Name, Id, Payload, Vector) ->
         (none) -> Payload;
         (_) -> erlang:error(exists)
     end, {value, Vector}).
+
+
+-spec get(
+        collection_name(), id()
+    ) -> payload().
+get(Name, Id) ->
+    case lookup(Name, Id) of
+        {value, Payload} ->
+            Payload;
+        none ->
+            erlang:error(not_found, [Name, Id])
+    end.
+
+
+-spec lookup(
+        collection_name(), id()
+    ) -> klsn:maybe(payload()).
+lookup(Name, Id) ->
+    CouchId = <<Name/binary, ":", Id/binary>>,
+    klsn_db:lookup(?MODULE, CouchId).
 
 
 -spec update(
