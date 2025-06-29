@@ -31,7 +31,7 @@
 % https://qdrant.github.io/qdrant/redoc/index.html
 
 -type collection_name() :: atom().
--type id() :: unicode:unicode_binary().
+-type id() :: integer() | unicode:unicode_binary().
 -type distance() :: dot | cosine.
 -type vector() :: [float(), ...].
 -type payload() :: map().
@@ -125,6 +125,10 @@ get(Name, Id) ->
 -spec lookup(
         collection_name(), id()
     ) -> klsn:maybe(payload()).
+lookup(Name, Id) when is_atom(Name) ->
+    lookup(atom_to_binary(Name), Id);
+lookup(Name, Id) when is_integer(Id) ->
+    lookup(Name, integer_to_binary(Id));
 lookup(Name, Id) ->
     CouchId = <<Name/binary, ":", Id/binary>>,
     klsn_db:lookup(?MODULE, CouchId).
