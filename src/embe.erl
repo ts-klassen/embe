@@ -5,6 +5,8 @@
       , new/0
       , new/1
       , add/2
+      , get/2
+      , lookup/2
       , update/3
       , update/4
       , search/2
@@ -121,6 +123,28 @@ add(MetaData, Opts=#{name:=Name, collection:=Collection, model:=Model, embedding
       , model => Model
       , version => 1
     }, Vector).
+
+-spec get(
+        id(), embeddings()
+   ) -> metadata().
+get(Id, Embe) ->
+    case lookup(Id, Embe) of
+        {value, Metadata} ->
+            Metadata;
+        none ->
+            erlang:error(not_found, [Id, Embe])
+    end.
+
+-spec lookup(
+        id(), embeddings()
+   ) -> klsn:maybe(metadata()).
+lookup(Id, #{name:=NameSpace, collection:=Collection}) ->
+    case embe_vector_db:lookup(Collection, Id) of
+        {value, #{<<"metadata">>:=Metadata, <<"namespace">>:=NS}} when NS =:= NameSpace ->
+            {value, Metadata};
+        _ ->
+            none
+    end.
 
 -spec update(
         id(), update_function(), embeddings()
