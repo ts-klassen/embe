@@ -89,7 +89,7 @@ new(Name) ->
         model => Model
       , size => 3072
       , distance => cosine
-      , name => klsn_binary:from_any(Name)
+      , name => klsn_binstr:from_any(Name)
       , collection => <<"embe-3072-cosine-", Model/binary>>
       , embeddings_function => fun(Input) ->
             gpte_embeddings:simple(Input, Model)
