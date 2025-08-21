@@ -1,6 +1,6 @@
 [{<<"gpte">>,
   {git,"https://github.com/ts-klassen/gpte.git",
-       {ref,"dc1d98e5c2d402b9bda299c40a566c3b982ab37c"}},
+       {ref,"f79dcedf6a739b5cdf81d0836b2b5958ff08de76"}},
   0},
  {<<"jsone">>,
   {git,"https://github.com/sile/jsone.git",
@@ -8,5 +8,5 @@
   0},
  {<<"klsn">>,
   {git,"https://github.com/ts-klassen/klsn.git",
-       {ref,"fad276127730bbb5958a9e4a474ba3a7d4a795d5"}},
+       {ref,"ed80f9727e83adf6f6d2bd5d5fc0177734b778b5"}},
   0}].

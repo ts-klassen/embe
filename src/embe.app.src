@@ -1,6 +1,6 @@
 {application, embe,
  [{description, "An OTP library"},
-  {vsn, "3.2.1"},
+  {vsn, "3.2.2"},
   {registered, []},
   {applications,
    [kernel,
