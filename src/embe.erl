@@ -7,6 +7,8 @@
       , add/2
       , get/2
       , lookup/2
+      , get_raw_vector/2
+      , lookup_raw_vector/2
       , update/3
       , update/4
       , search/2
@@ -146,6 +148,24 @@ lookup(Id, #{name:=NameSpace, collection:=Collection}) ->
             none
     end.
 
+-spec get_raw_vector(id(), embeddings()) -> embe_vector_db:vector().
+get_raw_vector(Id, Embe) ->
+    case lookup_raw_vector(Id, Embe) of
+        {value, Vector} ->
+            Vector;
+        none ->
+            erlang:error(not_found, [Id, Embe])
+    end.
+
+-spec lookup_raw_vector(id(), embeddings()) -> klsn:maybe(embe_vector_db:vector()).
+lookup_raw_vector(Id, #{name:=NameSpace, collection:=Collection}) ->
+    case embe_vector_db:lookup(Collection, Id) of
+        {value, #{<<"namespace">>:=NS}} when NS =:= NameSpace ->
+            embe_vector_db:lookup_vector(Collection, Id);
+        _ ->
+            none
+    end.
+
 -spec update(
         id(), update_function(), embeddings()
    ) -> metadata().
@@ -272,4 +292,3 @@ to_binary(Name) ->
 nest(Path0) ->
     Path10 = lists:map(fun to_binary/1, Path0),
     iolist_to_binary(lists:join(<<".">>, Path10)).
-

@@ -7,6 +7,8 @@
       , status/2
       , create_point/2
       , create_point/3
+      , get_point/2
+      , get_point/3
       , update_payload/2
       , update_payload/3
       , points_query/2
@@ -100,6 +102,49 @@ create_point(Db0, Data, #{url:=Url0}) ->
             ok
     end.
 
+% GET /collections/{collection_name}/points/{id}
+-spec get_point(db(), unicode:unicode_binary() | integer()) -> payload().
+get_point(Db, Id) ->
+    get_point(Db, Id, #{with_payload=>true, with_vector=>true}).
+
+-spec get_point(
+        db(),
+        unicode:unicode_binary() | integer(),
+        #{with_payload := boolean(), with_vector := boolean()}
+    ) -> payload().
+get_point(Db, Id, Opt) ->
+    get_point(Db, Id, Opt, db_info()).
+
+-spec get_point(
+        db(),
+        unicode:unicode_binary() | integer(),
+        #{with_payload := boolean(), with_vector := boolean()},
+        info()
+    ) -> payload().
+get_point(Db, Id, Opt, Info) when is_atom(Db) ->
+    get_point(atom_to_binary(Db), Id, Opt, Info);
+get_point(Db0, Id0, #{with_payload:=WithPayload, with_vector:=WithVector}, #{url:=Url0}) ->
+    Db1 = klsn_binstr:urlencode(Db0),
+    Db = <<"/collections/", Db1/binary>>,
+    Id = case Id0 of
+        N when is_integer(N) -> integer_to_binary(N);
+        B when is_binary(B) -> B
+    end,
+    Id1 = klsn_binstr:urlencode(Id),
+    Q = iolist_to_binary([
+        <<"?with_payload=">>, bool_bin(WithPayload),
+        <<"&with_vector=">>, bool_bin(WithVector)
+    ]),
+    Url = <<Url0/binary, Db/binary, "/points/", Id1/binary, Q/binary>>,
+    Req = {Url, []},
+    Res = httpc:request(get, Req, [], [{body_format, binary}]),
+    case Res of
+        {ok, {{_, Stat, _}, _, Data}} when 200=<Stat,Stat=<299 ->
+            jsone:decode(Data);
+        {ok, {{_, 404, _}, _, _}} ->
+            error(not_found)
+    end.
+
 
 -spec update_payload(db(), payload()) -> ok.
 update_payload(Db, Data0) ->
@@ -164,3 +209,5 @@ db_info() ->
     end,
     #{url=>Url}.
 
+bool_bin(true) -> <<"true">>;
+bool_bin(false) -> <<"false">>.

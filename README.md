@@ -69,6 +69,8 @@ If you are only using the `embe_vector_db` module, use `embe_vector_db:init/0` i
 <<"9b6c04ee-ea52-42b1-82df-874d61040bd1">>
 4> embe:search(<<"cbea8ed7-aa16-418c-a01b-89c6aad876cd">>, #{id_only => true}, Test). 
 [<<"9b6c04ee-ea52-42b1-82df-874d61040bd1">>]
+5> embe:get_raw_vector(<<"cbea8ed7-aa16-418c-a01b-89c6aad876cd">>, Test).
+[0.0123, ...]
 ```
 
 ### embe_vector_db

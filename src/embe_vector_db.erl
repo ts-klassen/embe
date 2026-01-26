@@ -8,6 +8,8 @@
       , insert/4
       , get/2
       , lookup/2
+      , get_vector/2
+      , lookup_vector/2
       , update/3
       , update/4
       , upsert/4
@@ -133,6 +135,34 @@ lookup(Name, Id) ->
     CouchId = <<Name/binary, ":", Id/binary>>,
     klsn_db:lookup(?MODULE, CouchId).
 
+%% Fetch the stored vector from Qdrant for a given point id.
+-spec get_vector(
+        collection_name(), id()
+    ) -> vector().
+get_vector(Name, Id) ->
+    case lookup_vector(Name, Id) of
+        {value, Vector} ->
+            Vector;
+        none ->
+            erlang:error(not_found, [Name, Id])
+    end.
+
+-spec lookup_vector(
+        collection_name(), id()
+    ) -> klsn:maybe(vector()).
+lookup_vector(Name, Id) when is_atom(Name) ->
+    lookup_vector(atom_to_binary(Name), Id);
+lookup_vector(Name, Id) when is_integer(Id) ->
+    lookup_vector(Name, integer_to_binary(Id));
+lookup_vector(Name, Id) ->
+    try embe_qdrant_rest_priv:get_point(Name, Id, #{with_payload=>false, with_vector=>true}) of
+        #{<<"result">>:=#{<<"vector">>:=Vector}} ->
+            {value, Vector}
+    catch
+        error:not_found ->
+            none
+    end.
+
 
 -spec update(
         collection_name(), id(), update_function()
@@ -247,4 +277,3 @@ uuid() ->
 
 vector_hash(List) when is_list(List) ->
     list_to_binary(string:lowercase(binary_to_list(binary:encode_hex(crypto:hash(sha256, term_to_binary(List)))))).
-
